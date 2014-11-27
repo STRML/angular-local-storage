@@ -347,6 +347,27 @@ describe('localStorageService', function() {
     expect($rootScope.test).toEqual(testValue);
   }));
 
+  it("should keep unserializable properties of bound objects when local storage is updated", inject(function ($rootScope, localStorageService, $window){
+    localStorageService.bind($rootScope, 'test');
+    $rootScope.test = {obj: {a:1}, func: function (){}};
+    // set the value in local storage mock to a value, then emit a changed event
+    var testValue = JSON.stringify({obj:{a:2}});
+    $window.localStorage['ls.test'] = testValue;
+    var evt = document.createEvent('CustomEvent');
+    evt.key = 'ls.test';
+    evt.newValue = 'test value';
+    evt.initCustomEvent('storage', true, true, {
+      key: 'ls.test',
+      newValue: testValue
+    });
+    window.dispatchEvent(evt);
+    $rootScope.$digest();
+
+    expect($rootScope.test.obj).toEqual({a:2});
+    expect($rootScope.test.func).toBeDefined();
+    expect(typeof $rootScope.test.func).toBe('function');
+  }));
+
   it('should be able to bind to scope using different key', inject(function($rootScope, localStorageService) {
 
     localStorageService.set('lsProperty', 'oldValue');

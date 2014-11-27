@@ -380,22 +380,25 @@ angularLocalStorage.provider('localStorageService', function() {
       } else if (isObject(value) && isObject(def)) {
         value = extend(def, value);
       }
-
       $parse(key).assign(scope, value);
 
       var onKeyUpdated = function (event) {
         if (event.key == deriveQualifiedKey(key)) {
-          scope[key] = getFromLocalStorage(key);
+          var updated = getFromLocalStorage(key);
+          if(scope[key] && typeof scope[key] === "object"){
+            angular.extend(scope[key], updated);
+          }
+          else {
+            scope[key] = updated;
+          }
           scope.$apply();
         }
       };
-
       $window.addEventListener("storage", onKeyUpdated, false);
 
       var unregisterWatch = scope.$watch(key, function (newVal) {
         addToLocalStorage(lsKey, newVal);
       }, isObject(scope[key]));
-
       return function () {
         unregisterWatch();
         $window.removeEventListener("storage", onKeyUpdated);
