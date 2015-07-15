@@ -339,7 +339,7 @@ angularLocalStorage.provider('localStorageService', function() {
           try {
             return JSON.parse(storedValues);
           } catch(e) {
-            return storedValues
+            return storedValues;
           }
         }
       }
@@ -383,26 +383,24 @@ angularLocalStorage.provider('localStorageService', function() {
       }
       $parse(key).assign(scope, value);
 
-      var onKeyUpdated = function (event) {
-        if (event.key == deriveQualifiedKey(key)) {
-          var updated = getFromLocalStorage(key);
-          if(scope[key] && typeof scope[key] === "object"){
-            angular.extend(scope[key], updated);
+      var onKeyUpdated = function (event, data) {
+        if (data.key === key) {
+          scope[key] = fromJson(data.newvalue);
+          if(!scope.$$phase) {
+            scope.$apply();
           }
-          else {
-            scope[key] = updated;
-          }
-          scope.$apply();
         }
       };
-      $window.addEventListener("storage", onKeyUpdated, false);
+      $rootScope.$on('LocalStorageModule.notification.setitem', onKeyUpdated);
+      $rootScope.$on('LocalStorageModule.notification.removeitem', onKeyUpdated);
 
       var unregisterWatch = scope.$watch(key, function (newVal) {
         addToLocalStorage(lsKey, newVal);
       }, isObject(scope[key]));
       return function () {
         unregisterWatch();
-        $window.removeEventListener("storage", onKeyUpdated);
+        $rootScope.$off('LocalStorageModule.notification.setitem', onKeyUpdated);
+        $rootScope.$off('LocalStorageModule.notification.removeitem', onKeyUpdated);
       };
     };
 

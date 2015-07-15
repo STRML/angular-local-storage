@@ -7,4 +7,5 @@ var isDefined = angular.isDefined,
   isObject = angular.isObject,
   isArray = angular.isArray,
   extend = angular.extend,
-  toJson = angular.toJson;
+  toJson = angular.toJson,
+  fromJson = angular.fromJson;
