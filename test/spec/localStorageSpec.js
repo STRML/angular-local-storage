@@ -1,5 +1,6 @@
 'use strict';
 
+/*global localStorageMock*/
 describe('localStorageService', function() {
   var elmSpy;
 
@@ -126,9 +127,16 @@ describe('localStorageService', function() {
   }
 
   beforeEach(module('LocalStorageModule', function($provide) {
-
+    spyOn(window, 'addEventListener').andCallThrough();
+    spyOn(window, 'removeEventListener').andCallThrough();
     $provide.value('$window', {
-      localStorage: localStorageMock()
+      localStorage: localStorageMock(),
+      addEventListener: function () {
+        window.addEventListener.apply(window, arguments);
+      },
+      removeEventListener : function (){
+        window.removeEventListener.apply(window, arguments);
+      }
     });
 
   }));
@@ -267,7 +275,7 @@ describe('localStorageService', function() {
       addItem('key', '777'),
       expectAdding('ls.key', angular.toJson('777')),
       expectMatching('key', '777')
-    )
+    );
   });
 
   it('should be able to get items', inject(
@@ -359,6 +367,7 @@ describe('localStorageService', function() {
     $rootScope.$digest();
 
     expect($rootScope.property).toEqual(localStorageService.get('property'));
+    expect(window.addEventListener).toHaveBeenCalled();
   }));
 
   it('should be able to unbind from scope variable', inject(function($rootScope, localStorageService) {
@@ -376,6 +385,7 @@ describe('localStorageService', function() {
     $rootScope.$digest();
 
     expect($rootScope.property).not.toEqual(localStorageService.get('property'));
+    expect(window.removeEventListener).toHaveBeenCalled();
   }));
 
   it('should be able to bind to properties of objects', inject(function($rootScope, localStorageService) {
@@ -391,6 +401,47 @@ describe('localStorageService', function() {
     expect($rootScope.obj.property).toEqual(localStorageService.get('obj.property'));
   }));
 
+  it('should update a bound value when local storage is updated', inject(function ($rootScope, localStorageService, $window){
+    localStorageService.bind($rootScope, 'test');
+    $rootScope.$digest();
+
+    // set the value in local storage mock to a value, then emit a changed event
+    var testValue = 'test';
+    $window.localStorage['ls.test'] = testValue;
+    var evt = document.createEvent('CustomEvent');
+    evt.key = 'ls.test';
+    evt.newValue = 'test value';
+    evt.initCustomEvent('storage', true, true, {
+      key: 'ls.test',
+      newValue: testValue
+    });
+    window.dispatchEvent(evt);
+    $rootScope.$digest();
+
+    expect($rootScope.test).toEqual(testValue);
+  }));
+
+  it('should keep unserializable properties of bound objects when local storage is updated', inject(function ($rootScope, localStorageService, $window){
+    localStorageService.bind($rootScope, 'test');
+    $rootScope.test = {obj: {a:1}, func: function (){}};
+    // set the value in local storage mock to a value, then emit a changed event
+    var testValue = JSON.stringify({obj:{a:2}});
+    $window.localStorage['ls.test'] = testValue;
+    var evt = document.createEvent('CustomEvent');
+    evt.key = 'ls.test';
+    evt.newValue = 'test value';
+    evt.initCustomEvent('storage', true, true, {
+      key: 'ls.test',
+      newValue: testValue
+    });
+    window.dispatchEvent(evt);
+    $rootScope.$digest();
+
+    expect($rootScope.test.obj).toEqual({a:2});
+    expect($rootScope.test.func).toBeDefined();
+    expect(typeof $rootScope.test.func).toBe('function');
+  }));
+
   it('should be able to bind to scope using different key', inject(function($rootScope, localStorageService) {
 
     localStorageService.set('lsProperty', 'oldValue');
@@ -402,6 +453,7 @@ describe('localStorageService', function() {
     $rootScope.$digest();
 
     expect($rootScope.property).toEqual(localStorageService.get('lsProperty'));
+    expect(window.addEventListener).toHaveBeenCalled();
   }));
 
   it('should $watch with deep comparison only for objects', inject(function($rootScope, localStorageService) {
@@ -477,7 +529,7 @@ describe('localStorageService', function() {
       localStorageService.set('keyAlpha', 'val');
 
       localStorageService.clearAll(/^key/);
-      
+
       for(var l = 0; l < 10; l++) {
         expect(localStorageService.get('key' + l)).toEqual(null);
         expect($window.localStorage.getItem('key' + l)).toEqual(null);
@@ -630,7 +682,7 @@ describe('localStorageService', function() {
 
     it('should be able to clear all owned keys from cookie', inject(function(localStorageService, $document) {
       localStorageService.set('ownKey1', 1);
-      $document.cookie = "username=John Doe";
+      $document.cookie = 'username=John Doe';
       localStorageService.clearAll();
       expect(localStorageService.get('ownKey1')).toEqual(null);
       expect($document.cookie).not.toEqual('');

@@ -1,6 +1,6 @@
 /**
  * An Angular module that gives you access to the browsers local storage
- * @version v0.2.2 - 2015-05-29
+ * @version v0.2.2 - 2015-07-15
  * @link https://github.com/grevory/angular-local-storage
  * @author grevory <greg@gregpike.ca>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -165,7 +165,6 @@ angularLocalStorage.provider('localStorageService', function() {
     // Directly get a value from local storage
     // Example use: localStorageService.get('library'); // returns 'angular'
     var getFromLocalStorage = function (key) {
-
       if (!browserSupportsLocalStorage || self.storageType === 'cookie') {
         if (!browserSupportsLocalStorage) {
           $rootScope.$broadcast('LocalStorageModule.notification.warning','LOCAL_STORAGE_NOT_SUPPORTED');
@@ -400,12 +399,29 @@ angularLocalStorage.provider('localStorageService', function() {
       } else if (isObject(value) && isObject(def)) {
         value = extend(def, value);
       }
-
       $parse(key).assign(scope, value);
 
-      return scope.$watch(key, function(newVal) {
+      var onKeyUpdated = function (event) {
+        if (event.key == deriveQualifiedKey(key)) {
+          var updated = getFromLocalStorage(key);
+          if(scope[key] && typeof scope[key] === "object"){
+            angular.extend(scope[key], updated);
+          }
+          else {
+            scope[key] = updated;
+          }
+          scope.$apply();
+        }
+      };
+      $window.addEventListener("storage", onKeyUpdated, false);
+
+      var unregisterWatch = scope.$watch(key, function (newVal) {
         addToLocalStorage(lsKey, newVal);
       }, isObject(scope[key]));
+      return function () {
+        unregisterWatch();
+        $window.removeEventListener("storage", onKeyUpdated);
+      };
     };
 
     // Return localStorageService.length

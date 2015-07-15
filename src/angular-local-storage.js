@@ -147,7 +147,6 @@ angularLocalStorage.provider('localStorageService', function() {
     // Directly get a value from local storage
     // Example use: localStorageService.get('library'); // returns 'angular'
     var getFromLocalStorage = function (key) {
-
       if (!browserSupportsLocalStorage || self.storageType === 'cookie') {
         if (!browserSupportsLocalStorage) {
           $rootScope.$broadcast('LocalStorageModule.notification.warning','LOCAL_STORAGE_NOT_SUPPORTED');
@@ -382,12 +381,29 @@ angularLocalStorage.provider('localStorageService', function() {
       } else if (isObject(value) && isObject(def)) {
         value = extend(def, value);
       }
-
       $parse(key).assign(scope, value);
 
-      return scope.$watch(key, function(newVal) {
+      var onKeyUpdated = function (event) {
+        if (event.key == deriveQualifiedKey(key)) {
+          var updated = getFromLocalStorage(key);
+          if(scope[key] && typeof scope[key] === "object"){
+            angular.extend(scope[key], updated);
+          }
+          else {
+            scope[key] = updated;
+          }
+          scope.$apply();
+        }
+      };
+      $window.addEventListener("storage", onKeyUpdated, false);
+
+      var unregisterWatch = scope.$watch(key, function (newVal) {
         addToLocalStorage(lsKey, newVal);
       }, isObject(scope[key]));
+      return function () {
+        unregisterWatch();
+        $window.removeEventListener("storage", onKeyUpdated);
+      };
     };
 
     // Return localStorageService.length
